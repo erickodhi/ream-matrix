@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ream Matrix - Exam Officer Issuance</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 font-sans antialiased">
+    <div class="flex h-screen overflow-hidden">
+        
+        <!-- Sidebar / Navigation -->
+        <div class="w-56 bg-slate-900 text-white flex flex-col justify-between">
+            <div>
+                <div class="p-3 text-lg font-bold tracking-wider border-b border-slate-800">
+                    Ream Matrix <span class="text-[10px] text-blue-400 block font-normal">Exam Office</span>
+                </div>
+                <nav class="mt-3 px-2.5 space-y-1">
+                    <a href="{{ url_for('exam_request_page') }}" class="block py-1.5 px-2.5 rounded bg-blue-600 text-white text-xs font-medium transition">Request Exam Papers</a>
+                    <a href="{{ url_for('hoi_page') }}" class="block py-1.5 px-2.5 rounded text-slate-300 hover:bg-slate-800 hover:text-white text-xs transition">Back to HOI Dashboard</a>
+                </nav>
+            </div>
+            <div class="p-2.5 border-t border-slate-800">
+                <span class="block text-[11px] text-slate-400 mb-1">Logged in: <strong>{{ current_user.username }}</strong></span>
+                <a href="{{ url_for('logout') }}" class="block w-full text-center bg-rose-600 hover:bg-rose-700 text-white py-1 rounded text-[11px] transition">Logout</a>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="flex-1 flex flex-col overflow-y-auto">
+            <header class="bg-white shadow-sm px-5 py-3 border-b flex justify-between items-center">
+                <h1 class="text-base font-bold text-slate-800">Exam Paper Requisition & Store Issuance</h1>
+                <div class="flex gap-4 text-xs">
+                    <span class="bg-slate-100 px-3 py-1 rounded border">Live Store Reams: <strong class="text-blue-600">{{ live_reams }}</strong></span>
+                    <span class="bg-slate-100 px-3 py-1 rounded border">Loose Pool Sheets: <strong class="text-amber-600">{{ loose_pool }}</strong></span>
+                </div>
+            </header>
+
+            <main class="p-5 max-w-2xl mx-auto w-full">
+                <!-- Flash Messages -->
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        {% for category, message in messages %}
+                            <div class="mb-4 p-3 rounded-lg text-xs text-white {% if category == 'danger' %}bg-rose-500{% elif category == 'success' %}bg-emerald-500{% else %}bg-blue-500{% endif %}">
+                                {{ message }}
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+
+                <div class="bg-white rounded-lg shadow-sm border border-slate-200 p-5">
+                    <h2 class="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 border-b pb-2">New Exam Issuance Request</h2>
+                    
+                    <form method="POST" id="examForm" class="space-y-4 text-xs">
+                        <div>
+                            <label class="block font-medium text-slate-700 mb-1">Subject / Title</label>
+                            <input type="text" name="subject_title" required placeholder="e.g. Mathematics Mid-Term Exam" class="w-full bg-slate-50 border border-slate-300 rounded px-3 py-2 text-xs text-slate-800 focus:outline-none focus:border-blue-500">
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block font-medium text-slate-700 mb-1">Form / Grade</label>
+                                <select name="form_grade" id="formGradeSelect" required class="w-full bg-slate-50 border border-slate-300 rounded px-3 py-2 text-xs text-slate-800">
+                                    <option value="">Select Form/Grade</option>
+                                    {% for fg in available_grades %}
+                                        <option value="{{ fg }}">{{ fg }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block font-medium text-slate-700 mb-1">Number of Students</label>
+                                <input type="number" name="num_students" id="numStudentsInput" required min="1" placeholder="e.g. 120" class="w-full bg-slate-50 border border-slate-300 rounded px-3 py-2 text-xs text-slate-800">
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block font-medium text-slate-700 mb-1">Number of Sheets per Student</label>
+                            <input type="number" name="sheets_per_student" id="sheetsPerStudentInput" required min="1" placeholder="e.g. 2" class="w-full bg-slate-50 border border-slate-300 rounded px-3 py-2 text-xs text-slate-800">
+                        </div>
+
+                        <!-- Calculation Preview Box -->
+                        <div class="bg-slate-50 p-3 rounded border border-slate-200 text-slate-600 space-y-1">
+                            <span class="font-semibold block text-slate-700">Calculation Preview:</span>
+                            <p>Total Raw Sheets = (Students &times; Sheets) + <span class="text-blue-600 font-semibold">60 buffer sheets</span> = <strong id="previewRaw">0</strong> sheets</p>
+                            <p>Estimated Reams Required: <strong id="previewReams" class="text-emerald-600">0</strong> reams (+ <span id="previewLoose" class="text-amber-600">0</span> loose sheets)</p>
+                        </div>
+
+                        <button type="button" onclick="openModal()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded transition text-xs shadow-sm">
+                            OK / Calculate & Review Request
+                        </button>
+                    </form>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Confirmation Modal Pop-up -->
+    <div id="confirmModal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-lg max-w-md w-full p-5 space-y-4 shadow-xl">
+            <h3 class="text-sm font-bold text-slate-900 uppercase border-b pb-2">Confirm Exam Paper Issuance</h3>
+            <p class="text-xs text-slate-600">You are about to issue exam papers based on the calculated requirements. Once approved, reams will be deducted from the store and recorded for HOI review.</p>
+            
+            <div class="flex justify-end gap-2 pt-2">
+                <button type="button" onclick="closeModal()" class="px-4 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded text-xs font-medium transition">
+                    Cancel
+                </button>
+                <button type="button" onclick="submitExamForm()" class="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-xs font-medium transition shadow-sm">
+                    Approve & Issue
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Live calculation preview script
+        const studentsInput = document.getElementById('numStudentsInput');
+        const sheetsInput = document.getElementById('sheetsPerStudentInput');
+        const previewRaw = document.getElementById('previewRaw');
+        const previewReams = document.getElementById('previewReams');
+        const previewLoose = document.getElementById('previewLoose');
+
+        function updatePreview() {
+            const students = parseInt(studentsInput.value) || 0;
+            const sheets = parseInt(sheetsInput.value) || 0;
+            const totalRaw = (students * sheets) + 60;
+            const reams = Math.floor(totalRaw / 500);
+            const loose = totalRaw % 500;
+
+            previewRaw.textContent = totalRaw;
+            previewReams.textContent = reams;
+            previewLoose.textContent = loose;
+        }
+
+        studentsInput.addEventListener('input', updatePreview);
+        sheetsInput.addEventListener('input', updatePreview);
+
+        function openModal() {
+            if(!studentsInput.value || !sheetsInput.value) {
+                alert("Please fill in all required fields first.");
+                return;
+            }
+            document.getElementById('confirmModal').classList.remove('hidden');
+        }
+
+        function closeModal() {
+            document.getElementById('confirmModal').classList.add('hidden');
+        }
+
+        function submitExamForm() {
+            document.getElementById('examForm').submit();
+        }
+    </script>
+</body>
+</html>

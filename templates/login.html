@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Ream Matrix</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-100 flex items-center justify-center min-h-screen text-slate-800">
+
+    <div class="bg-white border border-slate-200 p-8 rounded-xl shadow-lg w-full max-w-md">
+        <div class="text-center mb-6">
+            <h1 class="text-2xl font-bold text-slate-900 tracking-wide">REAM MATRIX</h1>
+            <p class="text-slate-500 text-sm mt-1">Institutional Paper & Exam Management</p>
+        </div>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="mb-4 p-3 rounded-lg text-sm bg-red-50 border border-red-200 text-red-600">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <form method="POST" class="space-y-5">
+            <div>
+                <label class="block text-slate-700 text-sm font-semibold mb-1.5">Username</label>
+                <input type="text" name="username" required 
+                    class="w-full px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-lg text-base text-slate-800 focus:outline-none focus:border-indigo-600 transition">
+            </div>
+
+            <div>
+                <label class="block text-slate-700 text-sm font-semibold mb-1.5">Password</label>
+                <input type="password" name="password" required 
+                    class="w-full px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-lg text-base text-slate-800 focus:outline-none focus:border-indigo-600 transition">
+            </div>
+
+            <button type="submit" 
+                class="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white text-base font-semibold rounded-lg shadow transition">
+                Sign In
+            </button>
+        </form>
+
+        <div class="mt-6 text-center text-sm text-slate-500">
+            Default Admin: <span class="text-slate-700 font-medium">admin</span> / <span class="text-slate-700 font-medium">admin123</span>
+        </div>
+    </div>
+
+</body>
+</html>

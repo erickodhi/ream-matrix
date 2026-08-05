@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ream Collection Compliance Report</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @media print {
+            body { print-color-adjust: exact; -webkit-print-color-adjust: exact; background: white; }
+            .no-print { display: none !important; }
+            .page-break { page-break-after: always; }
+        }
+    </style>
+</head>
+<body class="bg-slate-100 font-sans text-slate-800 p-6">
+    
+    <!-- Print Action Bar -->
+    <div class="max-w-4xl mx-auto mb-4 flex justify-between items-center no-print">
+        <a href="{{ url_for('hoi_page', year=filter_year, term=filter_term, stream=filter_stream, status=filter_status) }}" class="bg-slate-700 hover:bg-slate-800 text-white px-3 py-1.5 rounded text-xs font-medium transition">
+            &larr; Back to Dashboard
+        </a>
+        <button onclick="window.print()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-1.5 rounded text-xs font-medium shadow transition flex items-center gap-1.5">
+            <span>🖨️</span> Print / Export PDF Report
+        </button>
+    </div>
+
+    <!-- Official Report Document Container -->
+    <div class="max-w-4xl mx-auto bg-white p-8 rounded-xl shadow-md border border-slate-200">
+        
+        <!-- School Header -->
+        <div class="text-center border-b border-slate-300 pb-5 mb-5">
+            <h1 class="text-xl font-bold tracking-wider text-slate-900 uppercase">REAM MATRIX MANAGEMENT SYSTEM</h1>
+            <h2 class="text-sm font-semibold text-blue-600 uppercase mt-0.5">Official Ream Collection & Compliance Report</h2>
+            <p class="text-xs text-slate-500 mt-1">Generated on: {{ generated_date }} | Academic Year: <strong>{{ filter_year }}</strong> | Term: <strong>Term {{ filter_term }}</strong></p>
+        </div>
+
+        <!-- Filter Parameters Summary Meta Box -->
+        <div class="bg-slate-50 border border-slate-200 rounded-lg p-3 mb-6 grid grid-cols-3 gap-4 text-xs">
+            <div>
+                <span class="text-slate-400 block uppercase tracking-wider text-[10px]">Stream Filter</span>
+                <span class="font-semibold text-slate-800">{{ filter_stream }}</span>
+            </div>
+            <div>
+                <span class="text-slate-400 block uppercase tracking-wider text-[10px]">Status Filter</span>
+                <span class="font-semibold text-slate-800">{{ filter_status }}</span>
+            </div>
+            <div>
+                <span class="text-slate-400 block uppercase tracking-wider text-[10px]">Total Records Listed</span>
+                <span class="font-semibold text-slate-800">{{ report_rows|length }} Students</span>
+            </div>
+        </div>
+
+        <!-- Compliance Table -->
+        <table class="w-full text-left border-collapse text-xs mb-8">
+            <thead>
+                <tr class="bg-slate-900 text-white">
+                    <th class="py-2.5 px-3 font-semibold">#</th>
+                    <th class="py-2.5 px-3 font-semibold">Admin No</th>
+                    <th class="py-2.5 px-3 font-semibold">Student Name</th>
+                    <th class="py-2.5 px-3 font-semibold">Form / Grade</th>
+                    <th class="py-2.5 px-3 font-semibold">Stream</th>
+                    <th class="py-2.5 px-3 font-semibold">Gender</th>
+                    <th class="py-2.5 px-3 font-semibold text-right">Term Status</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-200">
+                {% for row in report_rows %}
+                <tr class="hover:bg-slate-50">
+                    <td class="py-2 px-3 text-slate-500">{{ loop.index }}</td>
+                    <td class="py-2 px-3 font-medium text-slate-900">{{ row.admin_no }}</td>
+                    <td class="py-2 px-3">{{ row.full_name }}</td>
+                    <td class="py-2 px-3">{{ row.form_grade }}</td>
+                    <td class="py-2 px-3">{{ row.stream }}</td>
+                    <td class="py-2 px-3">{{ row.gender }}</td>
+                    <td class="py-2 px-3 text-right">
+                        <span class="px-2 py-0.5 rounded text-[10px] font-semibold {% if row.status == 'Cleared' %}bg-emerald-100 text-emerald-800{% elif row.status == 'Pending' %}bg-amber-100 text-amber-800{% else %}bg-slate-100 text-slate-600{% endif %}">
+                            {{ row.status }}
+                        </span>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="7" class="py-6 text-center text-slate-400">No student records match the selected compliance parameters.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <!-- Official Sign & Stamp Section -->
+        <div class="mt-12 pt-6 border-t border-slate-300 grid grid-cols-2 gap-8 text-xs">
+            <!-- Collection Desk Officer -->
+            <div class="space-y-6">
+                <div>
+                    <p class="font-semibold text-slate-700">Verified By (Collection Desk Officer):</p>
+                    <div class="h-12 border-b border-dashed border-slate-400 mt-2 flex items-end pb-1">
+                        <span class="text-slate-400 italic text-[11px]">Signature</span>
+                    </div>
+                </div>
+                <div>
+                    <p class="text-slate-600">Name: <span class="border-b border-slate-300 inline-block w-48"></span></p>
+                    <p class="text-slate-600 mt-1">Date: <span class="border-b border-slate-300 inline-block w-48"></span></p>
+                </div>
+            </div>
+
+            <!-- Head of Institution (Principal) -->
+            <div class="space-y-6">
+                <div>
+                    <p class="font-semibold text-slate-700">Approved By (Head of Institution):</p>
+                    <div class="h-12 border-b border-dashed border-slate-400 mt-2 flex items-end pb-1 justify-between">
+                        <span class="text-slate-400 italic text-[11px]">Signature</span>
+                        <span class="text-slate-400 font-semibold text-[10px] uppercase border border-slate-300 px-3 py-1 rounded">Official Stamp</span>
+                    </div>
+                </div>
+                <div>
+                    <p class="text-slate-600">Name: <span class="border-b border-slate-300 inline-block w-48"></span></p>
+                    <p class="text-slate-600 mt-1">Date: <span class="border-b border-slate-300 inline-block w-48"></span></p>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</body>
+</html>

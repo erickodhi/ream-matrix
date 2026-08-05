@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ream Matrix - Collection Audit Trail</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 font-sans antialiased">
+    <div class="flex h-screen overflow-hidden">
+        
+        <!-- Sidebar -->
+        <div class="w-64 bg-slate-900 text-white flex flex-col justify-between">
+            <div>
+                <div class="p-5 text-2xl font-bold tracking-wider border-b border-slate-800">
+                    Ream Matrix <span class="text-xs text-blue-400 block">HOI Portal</span>
+                </div>
+                <nav class="mt-6 px-4 space-y-2">
+                    <a href="{{ url_for('hoi_page') }}" class="block py-2.5 px-4 rounded text-slate-300 hover:bg-slate-800 hover:text-white transition">Dashboard Overview</a>
+                    <a href="{{ url_for('audit_collectors') }}" class="block py-2.5 px-4 rounded bg-blue-600 text-white font-medium transition">Audit Collectors</a>
+                </nav>
+            </div>
+            <div class="p-4 border-t border-slate-800">
+                <span class="block text-xs text-slate-400 mb-2">Logged in as: <strong>{{ current_user.username }}</strong></span>
+                <a href="{{ url_for('logout') }}" class="block w-full text-center bg-rose-600 hover:bg-rose-700 text-white py-2 rounded text-sm transition">Logout</a>
+            </div>
+        </div>
+
+        <!-- Main Content Area -->
+        <div class="flex-1 flex flex-col overflow-y-auto">
+            <header class="bg-white shadow-sm px-8 py-4 flex justify-between items-center border-b">
+                <h1 class="text-xl font-bold text-slate-800">Collection Desk Audit Trail</h1>
+                <div class="text-sm text-slate-600">
+                    Active System Context: <span class="font-semibold text-blue-600">Year {{ active_year }} | Term {{ active_term }}</span>
+                </div>
+            </header>
+
+            <main class="p-8">
+                <!-- Flash Messages -->
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        {% for category, message in messages %}
+                            <div class="mb-4 p-4 rounded-lg text-white {% if category == 'danger' %}bg-rose-500{% elif category == 'success' %}bg-emerald-500{% else %}bg-blue-500{% endif %}">
+                                {{ message }}
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+
+                <!-- Filters -->
+                <div class="bg-white p-4 rounded-xl shadow-sm mb-6 flex flex-wrap gap-4 items-center justify-between">
+                    <form method="GET" action="{{ url_for('audit_collectors') }}" class="flex gap-4 items-center">
+                        <div>
+                            <label class="block text-xs font-medium text-slate-500 mb-1">Academic Year</label>
+                            <select name="year" class="border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                {% for y in available_years %}
+                                    <option value="{{ y }}" {% if filter_year == y %}selected{% endif %}>{{ y }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-slate-500 mb-1">Term Filter</label>
+                            <select name="term" class="border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <option value="">All Terms</option>
+                                <option value="Term 1" {% if filter_term == 'Term 1' %}selected{% endif %}>Term 1</option>
+                                <option value="Term 2" {% if filter_term == 'Term 2' %}selected{% endif %}>Term 2</option>
+                                <option value="Term 3" {% if filter_term == 'Term 3' %}selected{% endif %}>Term 3</option>
+                            </select>
+                        </div>
+                        <div class="self-end">
+                            <button type="submit" class="bg-slate-800 hover:bg-slate-900 text-white px-4 py-2 rounded-lg text-sm transition">Filter Logs</button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Audit Log Table -->
+                <div class="bg-white rounded-xl shadow-sm overflow-hidden border">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="bg-slate-50 border-b text-xs font-semibold text-slate-600 uppercase tracking-wider">
+                                <th class="p-4">Timestamp (UTC)</th>
+                                <th class="p-4">Collector Staff</th>
+                                <th class="p-4">Student Admin No</th>
+                                <th class="p-4">Student Name</th>
+                                <th class="p-4">Year & Term</th>
+                                <th class="p-4">Action Recorded</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100 text-sm text-slate-700">
+                            {% if audits %}
+                                {% for audit in audits %}
+                                    <tr class="hover:bg-slate-50">
+                                        <td class="p-4 text-slate-500">{{ audit.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                                        <td class="p-4 font-medium text-slate-900">{{ audit.collector_username }}</td>
+                                        <td class="p-4">{{ audit.student_admin_no }}</td>
+                                        <td class="p-4">{{ audit.student_name }}</td>
+                                        <td class="p-4">{{ audit.academic_year }} - {{ audit.term }}</td>
+                                        <td class="p-4">
+                                            {% if audit.action == 'Cleared' %}
+                                                <span class="inline-block px-2.5 py-1 text-xs font-semibold bg-emerald-100 text-emerald-800 rounded-full">Cleared</span>
+                                            {% else %}
+                                                <span class="inline-block px-2.5 py-1 text-xs font-semibold bg-amber-100 text-amber-800 rounded-full">Reverted</span>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            {% else %}
+                                <tr>
+                                    <td colspan="6" class="p-8 text-center text-slate-400">No collection audit records found for this selection.</td>
+                                </tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            </main>
+        </div>
+    </div>
+</body>
+</html>

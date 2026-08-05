@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ream Matrix - Exam Papers Issued Logs</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 font-sans antialiased">
+    <div class="flex h-screen overflow-hidden">
+        
+        <!-- Sidebar -->
+        <div class="w-56 bg-slate-900 text-white flex flex-col justify-between">
+            <div>
+                <div class="p-3 text-lg font-bold tracking-wider border-b border-slate-800">
+                    Ream Matrix <span class="text-[10px] text-blue-400 block font-normal">HOI Portal</span>
+                </div>
+                <nav class="mt-3 px-2.5 space-y-1">
+                    <a href="{{ url_for('hoi_page') }}" class="block py-1.5 px-2.5 rounded text-slate-300 hover:bg-slate-800 hover:text-white text-xs transition">Dashboard Overview</a>
+                    <a href="{{ url_for('hoi_exam_issued_papers') }}" class="block py-1.5 px-2.5 rounded bg-blue-600 text-white text-xs font-medium transition">Ream Papers Issued</a>
+                    <a href="{{ url_for('audit_collectors') }}" class="block py-1.5 px-2.5 rounded text-slate-300 hover:bg-slate-800 hover:text-white text-xs transition">Audit Collectors</a>
+                    <a href="{{ url_for('compliance_report') }}" class="block py-1.5 px-2.5 rounded text-emerald-400 hover:bg-slate-800 hover:text-white text-xs font-medium transition">📄 Compliance Report</a>
+                </nav>
+            </div>
+            <div class="p-2.5 border-t border-slate-800">
+                <span class="block text-[11px] text-slate-400 mb-1">Logged in: <strong>{{ current_user.username }}</strong></span>
+                <a href="{{ url_for('logout') }}" class="block w-full text-center bg-rose-600 hover:bg-rose-700 text-white py-1 rounded text-[11px] transition">Logout</a>
+            </div>
+        </div>
+
+        <!-- Main Content Area -->
+        <div class="flex-1 flex flex-col overflow-y-auto">
+            <header class="bg-white shadow-sm px-5 py-3 border-b flex justify-between items-center">
+                <h1 class="text-base font-bold text-slate-800">Exam Papers Issued Summary & Logs</h1>
+                <a href="{{ url_for('hoi_page') }}" class="bg-slate-900 text-white px-3 py-1 rounded text-xs font-medium hover:bg-slate-800 transition">
+                    &larr; Back to Dashboard
+                </a>
+            </header>
+
+            <main class="p-4 space-y-4">
+                <!-- Top Summary Cards -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                    <div class="bg-white p-3 rounded-lg shadow-sm border border-slate-200">
+                        <span class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Total Expected Reams</span>
+                        <div class="text-xl font-bold text-slate-800 mt-0.5">{{ total_expected }}</div>
+                        <span class="text-[10px] text-slate-500 block">Target student enrollment</span>
+                    </div>
+
+                    <div class="bg-white p-3 rounded-lg shadow-sm border border-slate-200">
+                        <span class="text-[10px] font-semibold text-emerald-600 uppercase tracking-wider">Total Collected</span>
+                        <div class="text-xl font-bold text-emerald-600 mt-0.5">{{ total_collected }}</div>
+                        <span class="text-[10px] text-slate-500 block">Brought in by students</span>
+                    </div>
+
+                    <div class="bg-white p-3 rounded-lg shadow-sm border border-slate-200">
+                        <span class="text-[10px] font-semibold text-blue-600 uppercase tracking-wider">Total Issued Out</span>
+                        <div class="text-xl font-bold text-blue-600 mt-0.5">{{ total_issued_out }}</div>
+                        <span class="text-[10px] text-slate-500 block">Handed to exam office</span>
+                    </div>
+
+                    <div class="bg-white p-3 rounded-lg shadow-sm border border-slate-200">
+                        <span class="text-[10px] font-semibold text-purple-600 uppercase tracking-wider">Live Store Reams</span>
+                        <div class="text-xl font-bold text-purple-600 mt-0.5">{{ total_live_reams }}</div>
+                        <span class="text-[10px] text-slate-500 block">Current store balance</span>
+                    </div>
+                </div>
+
+                <!-- Issuance Logs Table (Below Cards) -->
+                <div class="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden">
+                    <div class="px-4 py-3 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
+                        <h3 class="text-xs font-bold text-slate-800 uppercase tracking-wider">Exam Papers Issuance Logs</h3>
+                        <span class="text-[10px] text-slate-500">Chronological history of store issues</span>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse text-xs">
+                            <thead>
+                                <tr class="border-b border-slate-200 text-slate-500 bg-slate-50/50">
+                                    <th class="py-2.5 px-4 font-semibold">Timestamp</th>
+                                    <th class="py-2.5 px-4 font-semibold">Subject / Title</th>
+                                    <th class="py-2.5 px-4 font-semibold">Form / Grade</th>
+                                    <th class="py-2.5 px-4 font-semibold">Students</th>
+                                    <th class="py-2.5 px-4 font-semibold">Raw Sheets (+60 buffer)</th>
+                                    <th class="py-2.5 px-4 font-semibold text-blue-600">Ream(s) Issued</th>
+                                    <th class="py-2.5 px-4 font-semibold text-amber-600">Loose Leftover</th>
+                                    <th class="py-2.5 px-4 font-semibold">Issued By</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100 text-slate-700">
+                                {% for log in issuance_logs %}
+                                <tr class="hover:bg-slate-50 transition">
+                                    <td class="py-2.5 px-4 text-slate-500">{{ log.timestamp.strftime('%Y-%m-%d %H:%M') }}</td>
+                                    <td class="py-2.5 px-4 font-semibold text-slate-900">{{ log.subject_title }}</td>
+                                    <td class="py-2.5 px-4">{{ log.form_grade }}</td>
+                                    <td class="py-2.5 px-4">{{ log.num_students }}</td>
+                                    <td class="py-2.5 px-4">{{ log.total_raw_sheets }}</td>
+                                    <td class="py-2.5 px-4 text-blue-600 font-bold">{{ log.reams_issued }}</td>
+                                    <td class="py-2.5 px-4 text-amber-600 font-medium">{{ log.loose_sheets_leftover }}</td>
+                                    <td class="py-2.5 px-4 text-slate-600">{{ log.issued_by }}</td>
+                                </tr>
+                                {% else %}
+                                <tr>
+                                    <td colspan="8" class="py-6 text-center text-slate-400">No exam papers have been issued yet.</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+</body>
+</html>
