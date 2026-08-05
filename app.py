@@ -720,16 +720,11 @@ def collection_desk():
                 )
                 db.session.add(audit)
                 db.session.commit()
-                flash(f"Successfully reverted clearance for {student_to_update.full_name} (Term {active_term})!", "warning")
+                flash(f"Successfully reverted ream status for {student_to_update.full_name} (Term {active_term})!", "info")
 
         return redirect(url_for('collection_desk'))
 
-    return render_template('collection.html',
-                           students=students,
-                           search_query=search_query,
-                           active_year=active_year,
-                           active_term=active_term,
-                           total_enrolled=len(students))
+    return render_template('collection.html', students=students, search_query=search_query)
 
 if __name__ == '__main__':
     app.run(debug=True)
