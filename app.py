@@ -141,9 +141,12 @@ def exam_request_page():
     store_item = ReamStore.query.first()
     loose_pool = store_item.loose_sheets_balance if store_item else 0
 
-    # Scoped to active academic year and sorted for clean dropdown display
-    available_grades_query = db.session.query(Student.form_grade).filter_by(academic_year=active_year).distinct().all()
+    # Universal query across all student records with fallback defaults
+    available_grades_query = db.session.query(Student.form_grade).distinct().all()
     available_grades = sorted([g[0] for g in available_grades_query if g[0]])
+    
+    if not available_grades:
+        available_grades = ["Form 1", "Form 2", "Form 3", "Form 4", "Grade 10", "Grade 11", "Grade 12"]
 
     if request.method == 'POST':
         subject_title = request.form.get('subject_title')
@@ -188,7 +191,6 @@ def exam_request_page():
         flash("Exam paper issuance successfully approved and logged!", "success")
         return redirect(url_for('exam_request_page'))
 
-    # FIXED: Passed available_grades to the template context
     return render_template('exam.html', 
                            live_reams=live_reams, 
                            loose_pool=loose_pool, 
