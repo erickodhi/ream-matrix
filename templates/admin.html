@@ -23,6 +23,9 @@
                 <button onclick="switchTab('students')" id="navStudents" class="w-full flex items-center gap-3 px-4 py-2.5 text-slate-600 hover:bg-slate-100 rounded-lg font-medium text-sm transition text-left">
                     <i class="fa-solid fa-graduation-cap"></i> Student Enrollments
                 </button>
+                <button onclick="switchTab('sms')" id="navSMS" class="w-full flex items-center gap-3 px-4 py-2.5 text-slate-600 hover:bg-slate-100 rounded-lg font-medium text-sm transition text-left">
+                    <i class="fa-solid fa-comment-sms"></i> SMS Recipients
+                </button>
             </nav>
         </div>
         <div class="p-4 border-t border-slate-200">
@@ -291,6 +294,70 @@
                 </div>
             </div>
 
+            <!-- TAB 3: SMS RECIPIENTS SECTION -->
+            <div id="tabSMS" class="space-y-6 hidden">
+                <div class="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs">
+                    <div class="px-5 py-3.5 border-b border-slate-200 flex justify-between items-center">
+                        <div>
+                            <h3 class="font-semibold text-slate-800 text-xs uppercase tracking-wider">SMS Alert Recipients & Configurations</h3>
+                        </div>
+                        <div class="flex items-center gap-4">
+                            <div class="bg-slate-50 border border-slate-200 px-4 py-1.5 rounded-lg flex items-center gap-3">
+                                <span class="text-xs font-medium text-slate-500">Total Recipients:</span>
+                                <span class="text-base font-bold text-slate-900">{{ sms_recipients|length if sms_recipients else 0 }}</span>
+                            </div>
+                            <button onclick="openSmsModal()" class="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium rounded-lg transition flex items-center gap-1.5">
+                                <i class="fa-solid fa-plus"></i> Add Recipient
+                            </button>
+                        </div>
+                    </div>
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="bg-slate-50 text-slate-400 text-[11px] uppercase tracking-wider border-b border-slate-200">
+                                <th class="px-5 py-2.5">ID</th>
+                                <th class="px-5 py-2.5">Name</th>
+                                <th class="px-5 py-2.5">Phone Number</th>
+                                <th class="px-5 py-2.5">Alert Category</th>
+                                <th class="px-5 py-2.5 text-center">Status</th>
+                                <th class="px-5 py-2.5 text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100 text-xs">
+                            {% if sms_recipients %}
+                                {% for r in sms_recipients %}
+                                <tr class="hover:bg-slate-50 transition">
+                                    <td class="px-5 py-2.5 text-slate-400">#{{ r.id }}</td>
+                                    <td class="px-5 py-2.5 font-medium text-slate-800">{{ r.name }}</td>
+                                    <td class="px-5 py-2.5 font-mono text-slate-600">{{ r.phone_number }}</td>
+                                    <td class="px-5 py-2.5">
+                                        <span class="px-2.5 py-0.5 text-[11px] font-semibold rounded-full bg-blue-50 text-blue-700 border border-blue-200">{{ r.category }}</span>
+                                    </td>
+                                    <td class="px-5 py-2.5 text-center">
+                                        <span class="px-2.5 py-0.5 text-[11px] font-semibold rounded-full {% if r.is_active %}bg-emerald-50 text-emerald-700 border border-emerald-200{% else %}bg-slate-100 text-slate-500 border border-slate-200{% endif %}">
+                                            {{ 'Active' if r.is_active else 'Inactive' }}
+                                        </span>
+                                    </td>
+                                    <td class="px-5 py-2.5 text-right">
+                                        <form method="POST" class="inline">
+                                            <input type="hidden" name="action" value="delete_sms_recipient">
+                                            <input type="hidden" name="recipient_id" value="{{ r.id }}">
+                                            <button type="submit" onclick="return confirm('Are you sure you want to remove this SMS recipient?')" class="text-red-600 hover:text-red-800 text-xs font-medium bg-red-50 px-2.5 py-1 rounded border border-red-100 transition">
+                                                Delete
+                                            </button>
+                                        </form>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            {% else %}
+                                <tr>
+                                    <td colspan="6" class="text-center py-8 text-slate-400">No SMS recipients configured yet. Click "Add Recipient" above to get started.</td>
+                                </tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
         </div>
     </main>
 
@@ -451,110 +518,89 @@
         </div>
     </div>
 
-    <!-- MODAL: Promote Students Confirmation -->
-    <div id="promotionModal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-xs hidden flex items-center justify-center z-50">
-        <div class="bg-white border border-slate-200 rounded-xl w-full max-w-sm p-6 shadow-xl text-center">
-            <div class="w-12 h-12 bg-purple-50 text-purple-600 rounded-full flex items-center justify-center mx-auto mb-3 text-xl">
-                <i class="fa-solid fa-people-arrows"></i>
+    <!-- MODAL: Add SMS Recipient -->
+    <div id="smsModal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-xs hidden flex items-center justify-center z-50">
+        <div class="bg-white border border-slate-200 rounded-xl w-full max-w-md p-6 shadow-xl">
+            <div class="flex justify-between items-center mb-4 border-b border-slate-100 pb-3">
+                <h3 class="text-base font-bold text-slate-800">Add SMS Alert Recipient</h3>
+                <button onclick="closeSmsModal()" class="text-slate-400 hover:text-slate-700 text-lg"><i class="fa-solid fa-xmark"></i></button>
             </div>
-            <h3 class="text-base font-bold text-slate-800 mb-1">Promote Academic Year</h3>
-            <p class="text-xs text-slate-500 mb-5">This will advance all active student grade levels (e.g., Form 3 to Form 4) for the new academic cycle. Final year students will be graduated. Proceed?</p>
             
-            <form method="POST" class="flex justify-center gap-3">
-                <input type="hidden" name="action" value="promote_students">
-                <button type="button" onclick="closePromotionModal()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium rounded-lg">Cancel</button>
-                <button type="submit" class="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white text-xs font-medium rounded-lg">Yes, Promote All</button>
+            <form method="POST" class="space-y-4">
+                <input type="hidden" name="action" value="create_sms_recipient">
+                <div>
+                    <label class="block text-xs text-slate-700 mb-1 font-medium">Recipient Name</label>
+                    <input type="text" name="name" required placeholder="e.g., John Doe" class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-sm text-slate-800 focus:outline-none focus:border-indigo-600">
+                </div>
+                
+                <div>
+                    <label class="block text-xs text-slate-700 mb-1 font-medium">Phone Number</label>
+                    <input type="text" name="phone_number" required placeholder="e.g., +254712345678" class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-sm text-slate-800 focus:outline-none focus:border-indigo-600">
+                </div>
+
+                <div>
+                    <label class="block text-xs text-slate-700 mb-1 font-medium">Alert Category</label>
+                    <select name="category" required class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-sm text-slate-800 focus:outline-none focus:border-indigo-600">
+                        <option value="General">General Notification</option>
+                        <option value="Ream Balance">Ream Balance Alert</option>
+                        <option value="Admin Notice">Admin Notice</option>
+                    </select>
+                </div>
+
+                <div class="flex items-center gap-2 pt-1">
+                    <input type="checkbox" name="is_active" id="smsIsActive" value="1" checked class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500">
+                    <label for="smsIsActive" class="text-xs text-slate-700 font-medium">Active (Receive SMS Alerts)</label>
+                </div>
+                
+                <div class="flex justify-end gap-3 pt-4 border-t border-slate-100">
+                    <button type="button" onclick="closeSmsModal()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-medium rounded-lg">Cancel</button>
+                    <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg">Save Recipient</button>
+                </div>
             </form>
         </div>
     </div>
 
-    <!-- MODAL: Delete Student Confirmation -->
-    <div id="deleteModal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-xs hidden flex items-center justify-center z-50">
-        <div class="bg-white border border-slate-200 rounded-xl w-full max-w-sm p-6 shadow-xl text-center">
-            <div class="w-12 h-12 bg-red-50 text-red-600 rounded-full flex items-center justify-center mx-auto mb-3 text-xl">
-                <i class="fa-solid fa-triangle-exclamation"></i>
-            </div>
-            <h3 class="text-base font-bold text-slate-800 mb-1">Delete Student Record</h3>
-            <p class="text-xs text-slate-500 mb-5">Are you sure you want to delete <span id="deleteStudentName" class="font-semibold text-slate-700"></span>? This action cannot be undone.</p>
-            
-            <form method="POST" class="flex justify-center gap-3">
-                <input type="hidden" name="action" value="delete_student">
-                <input type="hidden" name="student_id" id="deleteStudentIdInput">
-                <button type="button" onclick="closeDeleteModal()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium rounded-lg">Cancel</button>
-                <button type="submit" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-xs font-medium rounded-lg">Yes, Delete</button>
-            </form>
-        </div>
-    </div>
-
-    <!-- Modals & Tabs JavaScript -->
+    <!-- JavaScript Navigation & Modals Logic -->
     <script>
-        function switchTab(tab) {
-            const navUsers = document.getElementById('navUsers');
-            const navStudents = document.getElementById('navStudents');
-            const tabUsers = document.getElementById('tabUsers');
-            const tabStudents = document.getElementById('tabStudents');
+        function switchTab(tabName) {
+            document.getElementById('tabUsers').classList.add('hidden');
+            document.getElementById('tabStudents').classList.add('hidden');
+            document.getElementById('tabSMS').classList.add('hidden');
 
-            if (tab === 'users') {
-                tabUsers.classList.remove('hidden');
-                tabStudents.classList.add('hidden');
-                
-                navUsers.className = "w-full flex items-center gap-3 px-4 py-2.5 bg-indigo-50 text-indigo-600 rounded-lg font-medium text-sm transition text-left";
-                navStudents.className = "w-full flex items-center gap-3 px-4 py-2.5 text-slate-600 hover:bg-slate-100 rounded-lg font-medium text-sm transition text-left";
-            } else if (tab === 'students') {
-                tabStudents.classList.remove('hidden');
-                tabUsers.classList.add('hidden');
-                
-                navStudents.className = "w-full flex items-center gap-3 px-4 py-2.5 bg-indigo-50 text-indigo-600 rounded-lg font-medium text-sm transition text-left";
-                navUsers.className = "w-full flex items-center gap-3 px-4 py-2.5 text-slate-600 hover:bg-slate-100 rounded-lg font-medium text-sm transition text-left";
+            document.getElementById('navUsers').className = "w-full flex items-center gap-3 px-4 py-2.5 text-slate-600 hover:bg-slate-100 rounded-lg font-medium text-sm transition text-left";
+            document.getElementById('navStudents').className = "w-full flex items-center gap-3 px-4 py-2.5 text-slate-600 hover:bg-slate-100 rounded-lg font-medium text-sm transition text-left";
+            document.getElementById('navSMS').className = "w-full flex items-center gap-3 px-4 py-2.5 text-slate-600 hover:bg-slate-100 rounded-lg font-medium text-sm transition text-left";
+
+            if (tabName === 'users') {
+                document.getElementById('tabUsers').classList.remove('hidden');
+                document.getElementById('navUsers').className = "w-full flex items-center gap-3 px-4 py-2.5 bg-indigo-50 text-indigo-600 rounded-lg font-medium text-sm transition text-left";
+            } else if (tabName === 'students') {
+                document.getElementById('tabStudents').classList.remove('hidden');
+                document.getElementById('navStudents').className = "w-full flex items-center gap-3 px-4 py-2.5 bg-indigo-50 text-indigo-600 rounded-lg font-medium text-sm transition text-left";
+            } else if (tabName === 'sms') {
+                document.getElementById('tabSMS').classList.remove('hidden');
+                document.getElementById('navSMS').className = "w-full flex items-center gap-3 px-4 py-2.5 bg-indigo-50 text-indigo-600 rounded-lg font-medium text-sm transition text-left";
             }
         }
 
-        // Modal Control Functions
-        function openUserModal() {
-            document.getElementById('userModal').classList.remove('hidden');
-        }
-        function closeUserModal() {
-            document.getElementById('userModal').classList.add('hidden');
-        }
+        function openUserModal() { document.getElementById('userModal').classList.remove('hidden'); }
+        function closeUserModal() { document.getElementById('userModal').classList.add('hidden'); }
 
         function openResetModal(userId, username) {
             document.getElementById('resetUserIdInput').value = userId;
             document.getElementById('resetUsernameDisplay').innerText = username;
             document.getElementById('resetModal').classList.remove('hidden');
         }
-        function closeResetModal() {
-            document.getElementById('resetModal').classList.add('hidden');
-        }
+        function closeResetModal() { document.getElementById('resetModal').classList.add('hidden'); }
 
-        function openStudentModal() {
-            document.getElementById('studentModal').classList.remove('hidden');
-        }
-        function closeStudentModal() {
-            document.getElementById('studentModal').classList.add('hidden');
-        }
+        function openStudentModal() { document.getElementById('studentModal').classList.remove('hidden'); }
+        function closeStudentModal() { document.getElementById('studentModal').classList.add('hidden'); }
 
-        function openBulkModal() {
-            document.getElementById('bulkModal').classList.remove('hidden');
-        }
-        function closeBulkModal() {
-            document.getElementById('bulkModal').classList.add('hidden');
-        }
+        function openBulkModal() { document.getElementById('bulkModal').classList.remove('hidden'); }
+        function closeBulkModal() { document.getElementById('bulkModal').classList.add('hidden'); }
 
-        function openPromotionModal() {
-            document.getElementById('promotionModal').classList.remove('hidden');
-        }
-        function closePromotionModal() {
-            document.getElementById('promotionModal').classList.add('hidden');
-        }
-
-        function confirmDelete(studentId, studentName) {
-            document.getElementById('deleteStudentIdInput').value = studentId;
-            document.getElementById('deleteStudentName').innerText = studentName;
-            document.getElementById('deleteModal').classList.remove('hidden');
-        }
-        function closeDeleteModal() {
-            document.getElementById('deleteModal').classList.add('hidden');
-        }
+        function openSmsModal() { document.getElementById('smsModal').classList.remove('hidden'); }
+        function closeSmsModal() { document.getElementById('smsModal').classList.add('hidden'); }
     </script>
 </body>
 </html>
