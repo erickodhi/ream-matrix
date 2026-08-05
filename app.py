@@ -116,9 +116,14 @@ with app.app_context():
     db.session.commit()
 
 # Routes
+@app.route('/exam', methods=['GET', 'POST'])
 @app.route('/exam/request', methods=['GET', 'POST'])
 @login_required
 def exam_request_page():
+    if current_user.role not in ['Exam', 'Admin']:
+        flash('Unauthorized access.', 'danger')
+        return redirect(url_for('login'))
+
     context = get_system_context()
     active_year = context['active_year']
     active_term = context['active_term']
@@ -246,7 +251,7 @@ def login():
             elif user.role == 'Collection':
                 return redirect(url_for('collection_desk'))
             elif user.role == 'Exam':
-                return redirect(url_for('exam_page'))
+                return redirect(url_for('exam_request_page'))
         else:
             flash('Invalid username or password.', 'danger')
             
@@ -623,14 +628,6 @@ def audit_collectors():
                            available_years=available_years, filter_year=filter_year,
                            filter_term=filter_term, active_year=context['active_year'],
                            active_term=context['active_term'])
-                           
-@app.route('/exam')
-@login_required
-def exam_page():
-    if current_user.role not in ['Exam', 'Admin']:
-        flash('Unauthorized access.', 'danger')
-        return redirect(url_for('login'))
-    return render_template('exam.html')
 
 @app.route('/logout')
 @login_required
@@ -710,7 +707,7 @@ def collection_desk():
                 elif active_term == '2': student_to_update.term_2_status = 'Pending'
                 elif active_term == '3': student_to_update.term_3_status = 'Pending'
                 
-                student_to_update.ream_owed += 1
+                student_to_update.ream_owed = min(3, student_to_update.ream_owed + 1)
                 
                 audit = CollectionAudit(
                     collector_username=current_user.username,
@@ -722,11 +719,11 @@ def collection_desk():
                 )
                 db.session.add(audit)
                 db.session.commit()
-                flash(f"Successfully reverted ream status for {student_to_update.full_name} (Term {active_term})!", "info")
+                flash(f"Successfully reverted clearance for {student_to_update.full_name} (Term {active_term})!", "warning")
 
         return redirect(url_for('collection_desk'))
 
-    return render_template('collection.html', students=students, search_query=search_query)
+    return render_template('collection.html', students=students, active_year=active_year, active_term=active_term)
 
 if __name__ == '__main__':
     app.run(debug=True)
