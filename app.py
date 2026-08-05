@@ -141,7 +141,7 @@ def exam_request_page():
     store_item = ReamStore.query.first()
     loose_pool = store_item.loose_sheets_balance if store_item else 0
 
-    # Updated: Scoped to active academic year and sorted for clean dropdown display
+    # Scoped to active academic year and sorted for clean dropdown display
     available_grades_query = db.session.query(Student.form_grade).filter_by(academic_year=active_year).distinct().all()
     available_grades = sorted([g[0] for g in available_grades_query if g[0]])
 
@@ -179,7 +179,6 @@ def exam_request_page():
         )
         db.session.add(new_issuance)
         
-        # Update loose sheets balance in store
         if store_item:
             store_item.loose_sheets_balance += loose_leftover
         else:
@@ -189,6 +188,7 @@ def exam_request_page():
         flash("Exam paper issuance successfully approved and logged!", "success")
         return redirect(url_for('exam_request_page'))
 
+    # FIXED: Passed available_grades to the template context
     return render_template('exam.html', 
                            live_reams=live_reams, 
                            loose_pool=loose_pool, 
