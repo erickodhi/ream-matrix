@@ -191,7 +191,9 @@ def exam_request_page():
             db.session.add(ReamStore(reams_balance=0, loose_sheets_balance=loose_leftover))
 
         db.session.commit()
-        flash("Exam paper issuance successfully approved and logged!", "success")
+        
+        # Explicit confirmation message telling them the exact reams to pick
+        flash(f"Issuance approved! Please collect {reams_to_issue} ream(s) from the store. ({loose_leftover} loose sheets added to pool).", "success")
         return redirect(url_for('exam_request_page'))
 
     return render_template('exam.html', 
