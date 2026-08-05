@@ -74,7 +74,7 @@ class ExamIssuanceLog(db.Model):
     sheets_per_student = db.Column(db.Integer, nullable=False)
     total_raw_sheets = db.Column(db.Integer, nullable=False) # (students * sheets) + 60
     reams_issued = db.Column(db.Integer, nullable=False)    # Whole reams taken from store
-    loose_sheets_leftover = db.Column(db.Integer, nullable=False) # Remainder loose sheets (<50 or added to pool)
+    loose_sheets_leftover = db.Column(db.Integer, nullable=False) # Remainder loose sheets added to pool
     issued_by = db.Column(db.String(100), nullable=False)    # Exam officer username
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
 
@@ -103,13 +103,11 @@ with app.app_context():
         db.session.add(admin_user)
         db.session.commit()
         
-    # Seed default global system settings if missing
     if not SystemSetting.query.filter_by(key='active_year').first():
         db.session.add(SystemSetting(key='active_year', value='2026'))
     if not SystemSetting.query.filter_by(key='active_term').first():
         db.session.add(SystemSetting(key='active_term', value='1'))
         
-    # Seed default Ream Store entry if missing
     if not ReamStore.query.first():
         db.session.add(ReamStore(reams_balance=100, loose_sheets_balance=0))
         
@@ -128,7 +126,6 @@ def exam_request_page():
     active_year = context['active_year']
     active_term = context['active_term']
 
-    # 1. Dynamically calculate total collected reams from all cleared students for active year/term
     students_in_year = Student.query.filter_by(academic_year=active_year).all()
     total_collected = 0
     for s in students_in_year:
@@ -136,17 +133,12 @@ def exam_request_page():
         if status == 'Cleared':
             total_collected += 1
 
-    # 2. Calculate total whole reams already issued out to the exam office
     total_issued_out = db.session.query(db.func.sum(ExamIssuanceLog.reams_issued)).scalar() or 0
-    
-    # 3. Live Store Balance = Total Collected minus Total Issued Out
     live_reams = max(0, total_collected - total_issued_out)
 
-    # 4. Get loose pool sheets from ReamStore or default to 0
     store_item = ReamStore.query.first()
     loose_pool = store_item.loose_sheets_balance if store_item else 0
 
-    # Universal query across all student records with fallback defaults
     available_grades_query = db.session.query(Student.form_grade).distinct().all()
     available_grades = sorted([g[0] for g in available_grades_query if g[0]])
     
@@ -160,8 +152,14 @@ def exam_request_page():
         sheets_per_student = int(request.form.get('sheets_per_student', 0))
 
         total_raw_sheets = (num_students * sheets_per_student) + 60
-        reams_to_issue = total_raw_sheets // 500
-        loose_leftover = total_raw_sheets % 500
+        
+        # Ceiling division: ensures requests under 500 sheets still issue 1 full ream
+        if total_raw_sheets <= 0:
+            reams_to_issue = 0
+            loose_leftover = 0
+        else:
+            reams_to_issue = (total_raw_sheets + 499) // 500
+            loose_leftover = (reams_to_issue * 500) - total_raw_sheets
 
         if live_reams <= 0:
             flash("No reams available in the live store!", "danger")
@@ -208,21 +206,16 @@ def hoi_exam_issued_papers():
     filter_year = request.args.get('year', context['active_year']).strip()
     filter_term = request.args.get('term', context['active_term']).strip()
 
-    # Total Expected Reams from active student counts for the selected year/term
     students_in_year = Student.query.filter_by(academic_year=filter_year).all()
     total_expected = len(students_in_year)
     
-    # Dynamically compute total cleared reams based on term status
     total_collected = 0
     for s in students_in_year:
         status = s.term_2_status if filter_term == '2' else (s.term_3_status if filter_term == '3' else s.term_1_status)
         if status == 'Cleared':
             total_collected += 1
     
-    # Total Issued Out to Exam Office for printing
     total_issued_out = db.session.query(db.func.sum(ExamIssuanceLog.reams_issued)).scalar() or 0
-    
-    # Total Live Reams currently remaining in store (Dynamic Calculation)
     total_live_reams = max(0, total_collected - total_issued_out)
 
     issuance_logs = ExamIssuanceLog.query.order_by(ExamIssuanceLog.timestamp.desc()).all()
