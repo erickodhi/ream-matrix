@@ -111,6 +111,30 @@
         </div>
     </div>
 
+    <!-- Success Modal Pop-up (Triggered automatically upon backend success) -->
+    {% if success_modal %}
+    <div id="successModal" class="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-lg max-w-md w-full p-5 space-y-4 shadow-xl text-xs">
+            <div class="flex items-center gap-2 border-b pb-2">
+                <span class="w-3 h-3 rounded-full bg-emerald-500 inline-block"></span>
+                <h3 class="text-sm font-bold text-slate-900 uppercase">Issuance Approved Successfully</h3>
+            </div>
+            <p class="text-slate-600">Your exam paper requisition for <strong class="text-slate-800">{{ issued_subject }}</strong> has been successfully processed and logged.</p>
+            
+            <div class="bg-slate-50 p-3 rounded border border-slate-200 space-y-1 text-slate-700">
+                <p>Reams to collect from store: <strong class="text-blue-600 text-sm">{{ issued_reams }} Ream(s)</strong></p>
+                <p>Remainder added to loose pool: <strong class="text-amber-600">{{ issued_leftover }} Sheet(s)</strong></p>
+            </div>
+
+            <div class="flex justify-end pt-2">
+                <button type="button" onclick="closeSuccessModal()" class="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-medium transition shadow-sm">
+                    Done / Dismiss
+                </button>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
     <script>
         // Live calculation preview script
         const studentsInput = document.getElementById('numStudentsInput');
@@ -131,8 +155,10 @@
             previewLoose.textContent = loose;
         }
 
-        studentsInput.addEventListener('input', updatePreview);
-        sheetsInput.addEventListener('input', updatePreview);
+        if(studentsInput && sheetsInput) {
+            studentsInput.addEventListener('input', updatePreview);
+            sheetsInput.addEventListener('input', updatePreview);
+        }
 
         function openModal() {
             if(!studentsInput.value || !sheetsInput.value) {
@@ -144,6 +170,13 @@
 
         function closeModal() {
             document.getElementById('confirmModal').classList.add('hidden');
+        }
+
+        function closeSuccessModal() {
+            const modal = document.getElementById('successModal');
+            if(modal) {
+                modal.remove();
+            }
         }
 
         function submitExamForm() {

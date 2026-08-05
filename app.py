@@ -192,9 +192,16 @@ def exam_request_page():
 
         db.session.commit()
         
-        # Explicit confirmation message telling them the exact reams to pick
+        # Pass success details to trigger the modal pop-up
         flash(f"Issuance approved! Please collect {reams_to_issue} ream(s) from the store. ({loose_leftover} loose sheets added to pool).", "success")
-        return redirect(url_for('exam_request_page'))
+        return render_template('exam.html', 
+                               live_reams=live_reams, 
+                               loose_pool=loose_pool, 
+                               available_grades=available_grades,
+                               success_modal=True,
+                               issued_reams=reams_to_issue,
+                               issued_leftover=loose_leftover,
+                               issued_subject=subject_title)
 
     return render_template('exam.html', 
                            live_reams=live_reams, 
@@ -714,11 +721,11 @@ def collection_desk():
                 )
                 db.session.add(audit)
                 db.session.commit()
-                flash(f"Successfully reverted clearance for {student_to_update.full_name} (Term {active_term})!", "warning")
+                flash(f"Reverted ream clearance for {student_to_update.full_name}.", "warning")
 
-        return redirect(url_for('collection_desk'))
+        return redirect(url_for('collection_desk', q=search_query))
 
-    return render_template('collection.html', students=students, active_year=active_year, active_term=active_term)
+    return render_template('collection.html', students=students, search_query=search_query, active_year=active_year, active_term=active_term)
 
 if __name__ == '__main__':
     app.run(debug=True)
