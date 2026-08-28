@@ -153,7 +153,6 @@ def exam_request_page():
 
         total_raw_sheets = (num_students * sheets_per_student) + 60
         
-        # Ceiling division: ensures requests under 500 sheets still issue 1 full ream
         if total_raw_sheets <= 0:
             reams_to_issue = 0
             loose_leftover = 0
@@ -192,7 +191,6 @@ def exam_request_page():
 
         db.session.commit()
         
-        # Pass success details to trigger the modal pop-up
         flash(f"Issuance approved! Please collect {reams_to_issue} ream(s) from the store. ({loose_leftover} loose sheets added to pool).", "success")
         return render_template('exam.html', 
                                live_reams=live_reams, 
@@ -461,7 +459,6 @@ def admin_page():
     available_years = db.session.query(Student.academic_year).distinct().all()
     available_years = [y[0] for y in available_years if y[0]]
 
-    # FIXED: Packaging active_year and active_term into global_context for admin.html template compatibility
     global_context = {
         'year': context['active_year'],
         'term': context['active_term']
@@ -715,3 +712,29 @@ def collection_desk():
                 if active_term == '1': student_to_update.term_1_status = 'Pending'
                 elif active_term == '2': student_to_update.term_2_status = 'Pending'
                 elif active_term == '3': student_to_update.term_3_status = 'Pending'
+                
+                student_to_update.ream_owed = student_to_update.ream_owed + 1
+                
+                audit = CollectionAudit(
+                    collector_username=current_user.username,
+                    student_admin_no=student_to_update.admin_no,
+                    student_name=student_to_update.full_name,
+                    academic_year=active_year,
+                    term=active_term,
+                    action='Reverted'
+                )
+                db.session.add(audit)
+                db.session.commit()
+                flash(f"Successfully reverted status for {student_to_update.full_name} (Term {active_term}).", "warning")
+                
+        return redirect(url_for('collection_desk', q=search_query))
+
+    for s in students:
+        if active_term == '1': s.current_status = s.term_1_status
+        elif active_term == '2': s.current_status = s.term_2_status
+        else: s.current_status = s.term_3_status
+
+    return render_template('collection.html', students=students, search_query=search_query, active_term=active_term)
+
+if __name__ == '__main__':
+    app.run(debug=True)
