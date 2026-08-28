@@ -461,10 +461,17 @@ def admin_page():
     available_years = db.session.query(Student.academic_year).distinct().all()
     available_years = [y[0] for y in available_years if y[0]]
 
+    # FIXED: Packaging active_year and active_term into global_context for admin.html template compatibility
+    global_context = {
+        'year': context['active_year'],
+        'term': context['active_term']
+    }
+
     return render_template('admin.html', 
                            users=users, students=students, pagination=pagination,
                            page=page, total_pages=pagination.pages, 
                            available_years=available_years,
+                           global_context=global_context,
                            active_year=context['active_year'],
                            active_term=context['active_term'])
     
@@ -708,24 +715,3 @@ def collection_desk():
                 if active_term == '1': student_to_update.term_1_status = 'Pending'
                 elif active_term == '2': student_to_update.term_2_status = 'Pending'
                 elif active_term == '3': student_to_update.term_3_status = 'Pending'
-                
-                student_to_update.ream_owed = min(3, student_to_update.ream_owed + 1)
-                
-                audit = CollectionAudit(
-                    collector_username=current_user.username,
-                    student_admin_no=student_to_update.admin_no,
-                    student_name=student_to_update.full_name,
-                    academic_year=active_year,
-                    term=active_term,
-                    action='Reverted'
-                )
-                db.session.add(audit)
-                db.session.commit()
-                flash(f"Reverted ream clearance for {student_to_update.full_name}.", "warning")
-
-        return redirect(url_for('collection_desk', q=search_query))
-
-    return render_template('collection.html', students=students, search_query=search_query, active_year=active_year, active_term=active_term)
-
-if __name__ == '__main__':
-    app.run(debug=True)
