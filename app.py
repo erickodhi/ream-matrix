@@ -5,7 +5,6 @@ from flask import Response, Flask, render_template, redirect, url_for, request, 
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
-import africastalking
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your-secure-secret-key-here'
@@ -16,17 +15,6 @@ db = SQLAlchemy(app)
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
-
-# --- AFRICA'S TALKING CONFIGURATION ---
-# Change username to 'sandbox' for testing, or your live username in production
-AT_USERNAME = "sandbox" 
-AT_API_KEY = "your_africastalking_api_key_here"
-try:
-    africastalking.initialize(AT_USERNAME, AT_API_KEY)
-    sms_client = africastalking.SMS
-except Exception as e:
-    sms_client = None
-    print(f"Africa's Talking initialization note: {e}")
 
 # User Model
 class User(UserMixin, db.Model):
@@ -92,18 +80,6 @@ class ExamIssuanceLog(db.Model):
 
     def __repr__(self):
         return f"<ExamIssuance {self.subject_title} - {self.reams_issued} Reams>"
-
-# Model for SMS Alert Recipients
-class AlertRecipient(db.Model):
-    __tablename__ = 'alert_recipient'
-    
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100), nullable=False)
-    phone_number = db.Column(db.String(30), unique=True, nullable=False)
-    role_title = db.Column(db.String(50), default='HOI') # e.g. HOI, Deputy, Principal
-    
-    def __repr__(self):
-        return f"<AlertRecipient {self.name} - {self.phone_number}>"
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -177,6 +153,7 @@ def exam_request_page():
 
         total_raw_sheets = (num_students * sheets_per_student) + 60
         
+        # Ceiling division: ensures requests under 500 sheets still issue 1 full ream
         if total_raw_sheets <= 0:
             reams_to_issue = 0
             loose_leftover = 0
@@ -194,12 +171,7 @@ def exam_request_page():
 
         if loose_pool > 50:
             flash("Action blocked: Loose sheets pool exceeds 50. Please disburse loose sheets first.", "danger")
-            return render_template('exam.html', 
-                                   live_reams=live_reams, 
-                                   loose_pool=loose_pool, 
-                                   available_grades=available_grades,
-                                   error_modal=True,
-                                   error_message="Action blocked: Loose sheets pool exceeds 50. Please disburse loose sheets first.")
+            return redirect(url_for('exam_request_page'))
 
         new_issuance = ExamIssuanceLog(
             subject_title=subject_title,
@@ -220,23 +192,7 @@ def exam_request_page():
 
         db.session.commit()
         
-        # --- SEND SMS NOTIFICATION TO SAVED RECIPIENTS ---
-        try:
-            recipients = AlertRecipient.query.all()
-            if recipients and sms_client:
-                phone_list = [r.phone_number for r in recipients]
-                remaining_stock = max(0, live_reams - reams_to_issue)
-                sms_text = (
-                    f"Ream Matrix Alert:\n"
-                    f"Subject: {subject_title} ({form_grade})\n"
-                    f"Reams Issued: {reams_to_issue}\n"
-                    f"Loose Pool: {loose_leftover}\n"
-                    f"Live Stock Left: {remaining_stock}"
-                )
-                sms_client.send(sms_text, phone_list)
-        except Exception as sms_err:
-            print(f"SMS dispatch note: {sms_err}")
-
+        # Pass success details to trigger the modal pop-up
         flash(f"Issuance approved! Please collect {reams_to_issue} ream(s) from the store. ({loose_leftover} loose sheets added to pool).", "success")
         return render_template('exam.html', 
                                live_reams=live_reams, 
@@ -279,7 +235,7 @@ def hoi_exam_issued_papers():
                            total_issued_out=total_issued_out,
                            total_live_reams=total_live_reams,
                            issuance_logs=issuance_logs)
-            
+                           
 @app.route('/', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
@@ -390,27 +346,6 @@ def admin_page():
                 user_to_reset.password = generate_password_hash(new_password, method='pbkdf2:sha256')
                 db.session.commit()
                 flash('Password reset successfully!', 'success')
-
-        # --- NEW: Admin Actions for Managing SMS Alert Recipients ---
-        elif action == 'add_alert_recipient':
-            name = request.form.get('recipient_name')
-            phone = request.form.get('recipient_phone')
-            role_title = request.form.get('recipient_role', 'HOI')
-            
-            if AlertRecipient.query.filter_by(phone_number=phone).first():
-                flash('This phone number is already registered for alerts!', 'danger')
-            else:
-                db.session.add(AlertRecipient(name=name, phone_number=phone, role_title=role_title))
-                db.session.commit()
-                flash(f'Alert recipient {name} added successfully!', 'success')
-                
-        elif action == 'delete_alert_recipient':
-            recipient_id = request.form.get('recipient_id')
-            recipient = AlertRecipient.query.get(int(recipient_id))
-            if recipient:
-                db.session.delete(recipient)
-                db.session.commit()
-                flash('Alert recipient removed successfully.', 'success')
                 
         elif action == 'enroll_student':
             context = get_system_context()
@@ -522,7 +457,6 @@ def admin_page():
     pagination = query.paginate(page=page, per_page=8, error_out=False)
     students = pagination.items
     users = User.query.all()
-    recipients = AlertRecipient.query.all()
 
     available_years = db.session.query(Student.academic_year).distinct().all()
     available_years = [y[0] for y in available_years if y[0]]
@@ -532,8 +466,7 @@ def admin_page():
                            page=page, total_pages=pagination.pages, 
                            available_years=available_years,
                            active_year=context['active_year'],
-                           active_term=context['active_term'],
-                           recipients=recipients)
+                           active_term=context['active_term'])
     
 @app.route('/hoi')
 @login_required
@@ -769,14 +702,8 @@ def collection_desk():
                 )
                 db.session.add(audit)
                 db.session.commit()
+                flash(f"Successfully cleared ream for {student_to_update.full_name} (Term {active_term})!", "success")
                 
-                store_item = ReamStore.query.first()
-                if store_item:
-                    store_item.reams_balance += 1
-                    db.session.commit()
-                
-                flash(f"Successfully cleared ream collection for {student_to_update.full_name}.", "success")
-
             elif action_type == 'revert' and current_status == 'Cleared':
                 if active_term == '1': student_to_update.term_1_status = 'Pending'
                 elif active_term == '2': student_to_update.term_2_status = 'Pending'
@@ -794,21 +721,11 @@ def collection_desk():
                 )
                 db.session.add(audit)
                 db.session.commit()
-                
-                store_item = ReamStore.query.first()
-                if store_item and store_item.reams_balance > 0:
-                    store_item.reams_balance -= 1
-                    db.session.commit()
-                    
-                flash(f"Reverted collection status for {student_to_update.full_name}.", "warning")
-                
+                flash(f"Reverted ream clearance for {student_to_update.full_name}.", "warning")
+
         return redirect(url_for('collection_desk', q=search_query))
 
-    return render_template('collection.html', 
-                           students=students, 
-                           search_query=search_query,
-                           active_year=active_year,
-                           active_term=active_term)
+    return render_template('collection.html', students=students, search_query=search_query, active_year=active_year, active_term=active_term)
 
 if __name__ == '__main__':
     app.run(debug=True)
