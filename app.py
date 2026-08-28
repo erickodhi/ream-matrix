@@ -21,7 +21,7 @@ class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(100), unique=True, nullable=False)
     password = db.Column(db.String(200), nullable=False)
-    role = db.Column(db.String(50), nullable=False) # 'Admin', 'HOI', 'Collection', 'Exam'
+    role = db.Column(db.String(50), nullable=False) # 'Admin', 'HOI', 'Collection'
 
 # System Settings Model for Global Parameters
 class SystemSetting(db.Model):
@@ -64,23 +64,6 @@ class CollectionAudit(db.Model):
     term = db.Column(db.String(20), nullable=False)
     action = db.Column(db.String(30), nullable=False) # 'Cleared' or 'Reverted'
 
-class ExamIssuanceLog(db.Model):
-    __tablename__ = 'exam_issuance_log'
-    
-    id = db.Column(db.Integer, primary_key=True)
-    subject_title = db.Column(db.String(150), nullable=False)
-    form_grade = db.Column(db.String(50), nullable=False)
-    num_students = db.Column(db.Integer, nullable=False)
-    sheets_per_student = db.Column(db.Integer, nullable=False)
-    total_raw_sheets = db.Column(db.Integer, nullable=False) # (students * sheets) + 60
-    reams_issued = db.Column(db.Integer, nullable=False)    # Whole reams taken from store
-    loose_sheets_leftover = db.Column(db.Integer, nullable=False) # Remainder loose sheets added to pool
-    issued_by = db.Column(db.String(100), nullable=False)    # Exam officer username
-    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
-
-    def __repr__(self):
-        return f"<ExamIssuance {self.subject_title} - {self.reams_issued} Reams>"
-
 @login_manager.user_loader
 def load_user(user_id):
     return db.session.get(User, int(user_id))
@@ -114,126 +97,6 @@ with app.app_context():
     db.session.commit()
 
 # Routes
-@app.route('/exam', methods=['GET', 'POST'])
-@app.route('/exam/request', methods=['GET', 'POST'])
-@login_required
-def exam_request_page():
-    if current_user.role not in ['Exam', 'Admin']:
-        flash('Unauthorized access.', 'danger')
-        return redirect(url_for('login'))
-
-    context = get_system_context()
-    active_year = context['active_year']
-    active_term = context['active_term']
-
-    students_in_year = Student.query.filter_by(academic_year=active_year).all()
-    total_collected = 0
-    for s in students_in_year:
-        status = s.term_2_status if active_term == '2' else (s.term_3_status if active_term == '3' else s.term_1_status)
-        if status == 'Cleared':
-            total_collected += 1
-
-    total_issued_out = db.session.query(db.func.sum(ExamIssuanceLog.reams_issued)).scalar() or 0
-    live_reams = max(0, total_collected - total_issued_out)
-
-    store_item = ReamStore.query.first()
-    loose_pool = store_item.loose_sheets_balance if store_item else 0
-
-    available_grades_query = db.session.query(Student.form_grade).distinct().all()
-    available_grades = sorted([g[0] for g in available_grades_query if g[0]])
-    
-    if not available_grades:
-        available_grades = ["Form 1", "Form 2", "Form 3", "Form 4", "Grade 10", "Grade 11", "Grade 12"]
-
-    if request.method == 'POST':
-        subject_title = request.form.get('subject_title')
-        form_grade = request.form.get('form_grade')
-        num_students = int(request.form.get('num_students', 0))
-        sheets_per_student = int(request.form.get('sheets_per_student', 0))
-
-        total_raw_sheets = (num_students * sheets_per_student) + 60
-        
-        if total_raw_sheets <= 0:
-            reams_to_issue = 0
-            loose_leftover = 0
-        else:
-            reams_to_issue = (total_raw_sheets + 499) // 500
-            loose_leftover = (reams_to_issue * 500) - total_raw_sheets
-
-        if live_reams <= 0:
-            flash("No reams available in the live store!", "danger")
-            return redirect(url_for('exam_request_page'))
-
-        if reams_to_issue > live_reams:
-            flash("The requested reams exceed available live store stock!", "danger")
-            return redirect(url_for('exam_request_page'))
-
-        if loose_pool > 50:
-            flash("Action blocked: Loose sheets pool exceeds 50. Please disburse loose sheets first.", "danger")
-            return redirect(url_for('exam_request_page'))
-
-        new_issuance = ExamIssuanceLog(
-            subject_title=subject_title,
-            form_grade=form_grade,
-            num_students=num_students,
-            sheets_per_student=sheets_per_student,
-            total_raw_sheets=total_raw_sheets,
-            reams_issued=reams_to_issue,
-            loose_sheets_leftover=loose_leftover,
-            issued_by=current_user.username
-        )
-        db.session.add(new_issuance)
-        
-        if store_item:
-            store_item.loose_sheets_balance += loose_leftover
-        else:
-            db.session.add(ReamStore(reams_balance=0, loose_sheets_balance=loose_leftover))
-
-        db.session.commit()
-        
-        flash(f"Issuance approved! Please collect {reams_to_issue} ream(s) from the store. ({loose_leftover} loose sheets added to pool).", "success")
-        return render_template('exam.html', 
-                               live_reams=live_reams, 
-                               loose_pool=loose_pool, 
-                               available_grades=available_grades,
-                               success_modal=True,
-                               issued_reams=reams_to_issue,
-                               issued_leftover=loose_leftover,
-                               issued_subject=subject_title)
-
-    return render_template('exam.html', 
-                           live_reams=live_reams, 
-                           loose_pool=loose_pool, 
-                           available_grades=available_grades)
-
-@app.route('/hoi/exam-issued-papers', methods=['GET'])
-@login_required
-def hoi_exam_issued_papers():
-    context = get_system_context()
-    filter_year = request.args.get('year', context['active_year']).strip()
-    filter_term = request.args.get('term', context['active_term']).strip()
-
-    students_in_year = Student.query.filter_by(academic_year=filter_year).all()
-    total_expected = len(students_in_year)
-    
-    total_collected = 0
-    for s in students_in_year:
-        status = s.term_2_status if filter_term == '2' else (s.term_3_status if filter_term == '3' else s.term_1_status)
-        if status == 'Cleared':
-            total_collected += 1
-    
-    total_issued_out = db.session.query(db.func.sum(ExamIssuanceLog.reams_issued)).scalar() or 0
-    total_live_reams = max(0, total_collected - total_issued_out)
-
-    issuance_logs = ExamIssuanceLog.query.order_by(ExamIssuanceLog.timestamp.desc()).all()
-
-    return render_template('exam_issued.html',
-                           total_expected=total_expected,
-                           total_collected=total_collected,
-                           total_issued_out=total_issued_out,
-                           total_live_reams=total_live_reams,
-                           issuance_logs=issuance_logs)
-                           
 @app.route('/', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
@@ -250,8 +113,6 @@ def login():
                 return redirect(url_for('hoi_page'))
             elif user.role == 'Collection':
                 return redirect(url_for('collection_desk'))
-            elif user.role == 'Exam':
-                return redirect(url_for('exam_request_page'))
         else:
             flash('Invalid username or password.', 'danger')
             
